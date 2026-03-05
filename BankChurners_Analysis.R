@@ -7,7 +7,7 @@
 library(dplyr)
 library(ggplot2)
 library(cluster)
-library(factoextra)
+# library(factoextra)
 library(scales)
 
 # ── 1. LOAD DATA ─────────────────────────────────────────────
@@ -106,10 +106,10 @@ ggsave("elbow_plot.png", plot = p0, width = 7, height = 4, dpi = 150)
 cat("\nElbow plot saved: elbow_plot.png\n")
 
 
-# ── 5. FIT K-MEANS (K = 5) ───────────────────────────────────
+# ── 5. FIT K-MEANS (K = 3) ───────────────────────────────────
 
 set.seed(42)
-km <- kmeans(cluster_scaled, centers = 5, nstart = 50, iter.max = 200)
+km <- kmeans(cluster_scaled, centers = 3, nstart = 50, iter.max = 200)
 df$segment <- as.factor(km$cluster)
 
 cat("\nCluster sizes:\n")
@@ -144,11 +144,9 @@ print(as.data.frame(segment_profiles))
 
 label_map <- segment_profiles %>%
   mutate(label = case_when(
-    churn_rate >= 40                              ~ "High-Risk Disengaged",
-    churn_rate >= 20 & avg_txn_freq < 0.6        ~ "Low-Engagement At-Risk",
-    avg_monthly_spend >= quantile(df$monthly_spend, 0.75) ~ "High-Value Active",
-    avg_utilization   >= quantile(df$utilization,   0.75) ~ "Revolving Heavy Users",
-    TRUE                                          ~ "Stable Moderate Users"
+    avg_monthly_spend == max(avg_monthly_spend) ~ "High-Value Active",
+    avg_utilization   == max(avg_utilization)   ~ "Revolving Heavy Users",
+    TRUE                                        ~ "Stable Moderate Users"
   )) %>%
   select(segment, label)
 
@@ -158,19 +156,17 @@ cat("\nSegment Labels:\n")
 print(label_map)
 
 
-# ── 8. KEY FINDING: LOW-ENGAGEMENT SEGMENTS ──────────────────
+# ── 8. KEY FINDING: HIGH-VALUE SEGMENT ───────────────────────
 
-low_engagement_labels <- c("High-Risk Disengaged", "Low-Engagement At-Risk")
-
-low_eng <- df %>% filter(label %in% low_engagement_labels)
+high_value <- df %>% filter(label == "High-Value Active")
 total_churners <- sum(df$churned)
-low_eng_churners <- sum(low_eng$churned)
+hv_churners <- sum(high_value$churned)
 
 cat("\n── Key Finding ──\n")
-cat(sprintf("Low-engagement segments: %d customers (%.1f%% of total)\n",
-            nrow(low_eng), nrow(low_eng) / nrow(df) * 100))
-cat(sprintf("Their share of total churn: %.1f%%\n",
-            low_eng_churners / total_churners * 100))
+cat(sprintf("High-Value Active segment: %d customers (%.1f%% of total)\n",
+            nrow(high_value), nrow(high_value) / nrow(df) * 100))
+cat(sprintf("Their churn rate: %.1f%%\n",
+            mean(high_value$churned) * 100))
 
 
 # ── 9. VISUALISATIONS ────────────────────────────────────────
@@ -226,22 +222,6 @@ cat("Tableau-ready export saved: BankChurners_Segmented.csv\n")
 cat("\n", strrep("=", 60), "\n")
 cat("RETENTION RECOMMENDATIONS\n")
 cat(strrep("=", 60), "\n\n")
-
-cat("Segment: High-Risk Disengaged\n")
-cat("  Profile : High inactivity, low spend growth, declining txn count\n")
-cat("  Actions :\n")
-cat("    • Re-engagement email/SMS with personalised cashback offer\n")
-cat("    • 'We miss you' bonus points for first purchase within 30 days\n")
-cat("    • Proactive outreach from relationship manager for premium card holders\n")
-cat("  Projected churn reduction: 10–15% with targeted win-back campaign\n\n")
-
-cat("Segment: Low-Engagement At-Risk\n")
-cat("  Profile : Low txn frequency, moderate inactivity, low spend\n")
-cat("  Actions :\n")
-cat("    • Introduce low-effort recurring-spend rewards (e.g., groceries, streaming)\n")
-cat("    • Simplified autopay or balance transfer offer to increase product stickiness\n")
-cat("    • Quarterly digital engagement nudges tied to rewards milestones\n")
-cat("  Projected churn reduction: 10–15% with engagement-driven loyalty program\n\n")
 
 cat("Segment: Revolving Heavy Users\n")
 cat("  Profile : High utilization, low open-to-buy; financially stressed\n")
